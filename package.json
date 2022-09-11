@@ -4,7 +4,7 @@
   "description": "Nacho Cheese Straight Chillin",
   "main": "chillybot.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest"
   },
   "repository": {
     "type": "git",
@@ -20,6 +20,10 @@
   },
   "homepage": "https://github.com/samuri51/chillybot#readme",
   "dependencies": {
+    "jest": "^28.1.1",
     "ttapi": "^4.0.0"
+  },
+  "devDependencies": {
+    "@babel/plugin-transform-modules-commonjs": "^7.18.2"
   }
 }
