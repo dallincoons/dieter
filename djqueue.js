@@ -1,39 +1,80 @@
 class DJQueue {
     constructor() {
         this.queue = [];
+        this.registeredUsers = [];
     }
 
     getQueue() {
         return this.queue;
     }
 
+    findNext() {
+        return this.queue.shift();
+    }
+
+    registerUser(id, name) {
+        console.log('register new user');
+        console.log({id});
+        console.log({name});
+        if (!this.registeredUsers.hasOwnProperty(id)) {
+            this.registeredUsers[id] = name;
+        }
+    }
+
+    getUserName(id) {
+        if (this.registeredUsers.hasOwnProperty(id)) {
+            return this.registeredUsers[id];
+        }
+
+        return "";
+    }
+
     addDJToQueue(id, name, previousID = null) {
-        if (id === previousID) {
+        // if (id === previousID) {
+        //     return;
+        // }
+
+        // if (name === "") {
+        //     console.log("name is empty");
+        //     return;
+        // }
+
+        if (id === "") {
+            console.log("id is empty");
             return;
         }
+
+        console.log({id});
+        console.log({name});
+
+        this.registerUser(id, name);
 
         //if there is nobody in queue, simply add the dJ to the queue and be done
-        if (this.queue.length < 1) {
-            this.queue.push({
-                id: id,
-                name: name,
-                previousDJ: undefined,
-                nextDJ: undefined,
-                first: true,
-            });
-            //somehow notify caller this is the first on the queue?
-            return;
-        }
-
-        let previousDJ = this.queue.find((dj) => {
-            return dj.id === previousID;
+        // if (this.queue.length < 1) {
+        this.queue.push({
+            id: id,
+            name: name,
+            previousDJ: undefined,
+            nextDJ: undefined,
+            first: true,
         });
 
-        if (!previousDJ) {
-            console.log("error: there is no previous dj for " + previousID);
-            //not sure how to fix this yet
-            return;
-        }
+        console.log("queue");
+        console.log(this.queue);
+
+            //somehow notify caller this is the first on the queue?
+        return;
+        // }
+
+        // let previousDJ = this.queue.find((dj) => {
+        //     return dj.id === previousID;
+        // });
+
+        // if (!previousDJ) {
+        //     console.log("error: there is no previous dj for " + previousID);
+        //     //not sure how to fix this yet
+        //     return;
+        // }
 
         let inQueue = this.queue.find((dj) => {
             return dj.id === id;
@@ -109,6 +150,12 @@ class DJQueue {
                 first: false,
             });
             previousDJ.nextDJ = id;
+    }
+
+    removeDJ(id) {
+        this.queue = this.queue.filter((dj) =>  {
+            return dj.id !== id;
+        });
     }
 
     getNextDJ(id) {
@@ -188,9 +235,9 @@ class DJQueue {
         console.log({removeDJ});
 
         if (!removeDJ) {
-            console.log("couldn't remove DJ: " + ID);
+            console.log("Not in the queue! " + ID);
             //what else do we need to do?
-            return;
+            return 1;
         }
 
         let previousDJ = this.queue.find((dj) => {

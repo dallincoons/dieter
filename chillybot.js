@@ -11,102 +11,99 @@ var ROOMID = '60820a5647c69b001b3aa1f9';
 
 // var AUTH = 'dXhZHlHryToxwdnFpxSffHje';
 // var USERID = '628ed9e688b736001d2464f4';
-// var ROOMID = '62b8af5088b736001dfd4052';
+// var ROOMID = '63309a47748e09001fda9864';
 
 let bot = new Bot(AUTH, USERID, ROOMID);
 bot.debug = true;
 
-let lastDJ = undefined;
-let oneAndDone = false;
-let currentDJs = [];
+let playLimit = 1;
 
 let queue;
+let lastDJ = undefined;
+let oneAndDone = false;
+let currentDJ = undefined;
+let currentDJs = [];
+let userPlays = {};
+let nextDJInLine;
+let nextInLineTimeout;
+let rotateStarted = false;
 
 bot.on('ready', function (data) {
+	console.log("on ready");
+	console.log({data});
 	bot.roomRegister(ROOMID);
-	queue = new DJQueue();
 });
 
 bot.on('roomChanged', function (data) {
-	currentDJs = Object.assign({}, data.room.metadata.djs);
+	console.log("on room changed");
+	console.log({data});
+	currentDJs = data.room.metadata.djs;
 
-	if (oneAndDone) {
-		addCurrentDJsToQueue();
+	if (!queue) {
+		console.log("initializing queue");
+		queue = new DJQueue();
 	}
+
+	let users = data.users || [];
+
+	users.forEach((user) => {
+		queue.registerUser(user.userid, user.name);
+	});
+
+	console.log('all registered users');
+	console.log(queue.registeredUsers);
+
 	bot.bop();
 });
+
+function startOneAndDone() {
+	queue.queue = [];
+	registerUsers();
+
+	oneAndDone = true;
+
+	bot.speak('One and done engaged!');
+}
 
 bot.on('speak', function (data) {
 	if (!data.text) {
 		return;
 	}
 
-	if (data.text === '/rotate' && !oneAndDone) {
-		oneAndDone = true;
+	if (data.text === '/rotate' && !oneAndDone && !rotateStarted) {
+		rotateStarted = true;
 
-		addCurrentDJsToQueue();
+		console.log('starting rotate');
+		console.log({currentDJs});
+		currentDJs.forEach((djID) => {
+			console.log(queue.getUserName(djID));
+		});
 
-		bot.speak('One and done engaged!');
+		let firstDJ = currentDJs[0];
+
+		console.log({lastDJ});
+		console.log(queue.getUserName(lastDJ));
+
+		if (firstDJ == lastDJ) {
+			bot.speak('One and done engaged, effective immediately!');
+		} else {
+			bot.speak('One and done will start with @' + queue.getUserName(firstDJ));
+		}
+
 		return;
 	}
 
-	if (data.text === '/beforeme' && oneAndDone) {
-		let djSpoke = queue.getQueue().find((dj) =>  {
-			return dj.id === data.userid;
-		});
-
-		if (!djSpoke) {
-			bot.speak("You are not in the queue!");
-			return;
-		}
-
-		let previousDJ = queue.getPreviousDJ(data.userid);
-
-		if (!previousDJ) {
-			bot.speak("I'm not sure who is before you!");
-			return;
-		}
-
-		bot.speak("@" + previousDJ.name + " is before you");
-	}
-
-	if (data.text === '/afterme' && oneAndDone) {
-		let djSpoke = queue.getQueue().find((dj) =>  {
-			return dj.id === data.userid;
-		});
-
-		if (!djSpoke) {
-			bot.speak("You are not in the queue!");
-			return;
-		}
-
-		let nextDJ = queue.getNextDJ(data.userid);
-
-		if (!nextDJ) {
-			bot.speak("I'm not sure who is after you!");
-		}
-
-		bot.speak("@" + nextDJ.name + " is after you.");
-	}
-
-	if (data.text === '/rotate' && oneAndDone) {
+	if (data.text === '/rotate' && (oneAndDone || rotateStarted)) {
 		bot.speak('One and done already engaged! To disengage, type /stoprotate');
 		return;
 	}
 
-	if (data.text === '/rotate' && oneAndDone) {
-		bot.speak('One and done already engaged! To disengage, type /stoprotate');
+	if (data.text === '/stoprotate' && (oneAndDone || rotateStarted)) {
+		stopRotate();
 		return;
 	}
 
-	if (data.text === '/stoprotate' && oneAndDone) {
-		oneAndDone = false;
-		queue.clear();
-		bot.speak('One and done disengaged! Spin as much as you like. Do not exercise moderation.');
-		return;
-	}
-
-	if (data.text === '/stoprotate' && !oneAndDone) {
+	if (data.text === '/stoprotate' && !oneAndDone && !rotateStarted) {
 		bot.speak('One and done not engaged yet!');
 		return;
 	}
@@ -125,7 +122,11 @@ bot.on('speak', function (data) {
 			return;
 		}
 
-		queue.removeDJFromQueue(data.userid);
+		let result = queue.removeDJ(data.userid);
+		if (result === 1) {
+			bot.speak("@"+data.name + ", you are not in the queue!");
+			return;
+		}
 		console.log('queue after removing DJ from queue');
 		console.log(queue.getQueue());
 
@@ -133,14 +134,32 @@ bot.on('speak', function (data) {
 		return;
 	}
 
-	if (data.text.startsWith('/addme')) {
+	if (data.text === '/queue') {
+		if (!oneAndDone) {
+			bot.speak("There currently is no queue.");
+			return;
+		}
+
+		if (queue.getQueue().length < 1) {
+			bot.speak("There is nobody in the queue.");
+			return;
+		}
+
+		bot.speak("Current queue is: " + queue.getQueue().map(function(dj) {
+			return dj.name;
+		}).join(", "));
+	}
+
+	if (data.text ===  '/addme') {
 		if (!oneAndDone) {
 			bot.speak('@' + data.name + ", there currently is no queue. Feel free to hop up whenever suits you.");
 			return;
 		}
 
 		let queuedDJ = queue.getQueue().find((dj) =>  {
-			return dj.id === data.userid;
+			console.log({dj});
+			console.log(data.userid);
+			return dj.id == data.userid;
 		});
 
 		if (queuedDJ) {
@@ -149,32 +168,9 @@ bot.on('speak', function (data) {
 			return;
 		}
 
-		let danglingDJ = queue.getDanglingDJ();
-
-		if (danglingDJ && danglingDJ.id !== data.userid)  {
-			queue.addDJToQueue(data.userid, data.name, danglingDJ.id);
-			bot.speak('@' + data.name + ", you have been added to the queue!");
-			console.log("queue after adding DJ after dangling DJ");
-			console.log(queue.getQueue());
+		if (Array.isArray(currentDJs) && currentDJs.includes(data.userid)) {
+			bot.speak("Please wait until you are not on deck. You will be automatically added to the queue after your turn.");
 			return;
-		}
-
-		let cDJs = Object.values(currentDJs);
-		if (cDJs.length > 0) {
-			let firstPlayingDJ = cDJs[0];
-			if (firstPlayingDJ.previousDJ !== undefined) {
-				queue.addDJToQueue(data.userid, data.name, firstPlayingDJ.previousDJ);
-				bot.speak('@' + data.name + ", you have been added to the queue!");
-				console.log("queue after adding DJ when queue is circular");
-				console.log(queue.getQueue());
-				return;
-			} else {
-				queue.addDJToQueue(data.userid, data.name, cDJs[cDJs.length - 1].id);
-				bot.speak('@' + data.name + ", you have been added to the queue!");
-				console.log("queue when adding DJ when queue is not circular");
-				console.log(queue.getQueue());
-				return;
-			}
 		}
 
 		queue.addDJToQueue(data.userid, data.name);
@@ -211,16 +207,24 @@ bot.on('speak', function (data) {
 	}
 });
 
-function addCurrentDJsToQueue() {
+function stopRotate() {
+	oneAndDone = false;
+	rotateStarted = false;
+	queue.clear();
+	userPlays = {};
+	bot.speak('One and done disengaged!');
+}
+
+function registerUsers() {
 	let lastDJID;
 	Object.values(currentDJs).forEach(djID => {
 		bot.getProfile(djID, (prof) => {
-			queue.addDJToQueue(prof.userid, prof.name, lastDJID);
+			console.log('registering user');
+			console.log(prof.userid);
+			console.log(prof.name);
+			queue.registerUser(prof.userid, prof.name);
 			lastDJID = djID;
 			lastDJ = djID;
-
-			console.log('queue after adding DJ to queue');
-			console.log(queue.getQueue());
 		});
 	});
 }
@@ -246,7 +250,18 @@ bot.on('registered', function (data) {
 		return;
 	}
 
+	if (!queue) {
+		queue = new DJQueue();
+	}
+
 	let userID = getUserIDFromEvent(data);
+
+	// console.log("registered");
+	// console.log(data);
+	// console.log(userID);
+	// console.log(queue.getUserName(userID));
+
+	queue.registerUser(data['user'][0].userid, data['user'][0].name);
 
 	if (oneAndDone) {
 		bot.pm("Welcome! The room is currently one and done. Feel free to add yourself to the rotation by snagging a DJ spot, or by typing /addme.", userID);
@@ -264,84 +279,102 @@ bot.on('newsong', (data) => {
 });
 
 bot.on('add_dj', (data) => {
-	currentDJs = data.djs;
+	let userid = data['user'][0].userid;
 
-	console.log('queue before adding dj');
-	console.log(queue.getQueue());
-
-	if (!oneAndDone) {
-		return;
+	if (nextDJInLine) {
+		if (userid != nextDJInLine.id) {
+			bot.speak("Be cool, we're still waiting for @" + nextDJInLine.name + " to hop up.");
+			bot.remDj(userid);
+			return;
+		}
+		nextDJInLine = null;
+		clearTimeout(nextInLineTimeout);
 	}
 
-	queue.addDJToQueue(data['user'][0].userid, data['user'][0].name, stuff.determineSecondToRightMostDJ(data.djs));
+	let index = currentDJs.findIndex((currentDJ) => {
+		return currentDJ === userid
+	});
+	if (!index) {
+		currentDJs.push(userid);
+	}
+	if (!oneAndDone) {
+		return
+	}
 
-	console.log('queue after adding dj');
-	console.log(queue.getQueue());
+	console.log("current djs after adding");
+	console.log({currentDJs});
+	console.log('current dj names after adding');
+	if (Array.isArray(currentDJs)) {
+		currentDJs.forEach((cdj) => {
+			console.log(queue.getUserName(cdj));
+		})
+	}
+
+	queue.removeDJ(userid);
+
+	queue.registerUser(userid, data['user'][0].name);
 });
 
 bot.on('rem_dj', function (data) {
-	currentDJs = data.djs;
+	console.log("remove dj!");
+	let userid = data['user'][0].userid;
+	console.log({userid});
+	console.log();
 
-	console.log('queue when removing dj');
-	console.log(queue.getQueue());
-	console.log({currentDJs});
+	let index = currentDJs.findIndex((currentDJ) => {
+		return currentDJ === userid
+	});
+	console.log("index when removing");
+	console.log(index);
+	console.log(index > -1);
 
-	if (currentDJs.length < 1) {
-		queue.getQueue().clear();
-		console.log('queue cleared');
-		console.log(queue.getQueue());
+	let removedDJid;
+
+	if (index > -1) {
+		removedDJid = currentDJs[index];
+		currentDJs.splice(index, 1);
 	}
+
+	console.log("current djs after removing");
+	console.log({currentDJs});
+	console.log({removedDJid});
 
 	if (!oneAndDone) {
 		return;
 	}
 
-	let rightMostDJID = stuff.determineRightMostDJ(data.djs);
+	let nextDJ = queue.findNext();
 
-	if (!rightMostDJID) {
-		return;
-	}
-
-	let rightMostDJ = queue.getQueue().find((dj) => {
-		return dj.id === rightMostDJID;
-	});
-
-	if (rightMostDJ === undefined) {
-		return;
-	}
-
-	let next = queue.getQueue().find((dj) => {
-		return dj.id === rightMostDJ.nextDJ;
-	});
-
-	if (!next)  {
-		let leftMostDJ = queue.getQueue().find((dj) => {
-			return dj.previousdJ === undefined;
-		});
-
-		if (Object.values(currentDJs).includes(leftMostDJ.id)) {
-			return;
-		}
-
-		bot.speak('@' + leftMostDJ.name + ", you're up!");
-		return;
-	}
-
-	if (Object.values(currentDJs).includes(next.id)) {
-		return;
-	}
-
-	console.log('queue when notifying next dj');
+	console.log('queue after popping');
 	console.log(queue.getQueue());
+	console.log({nextDJ});
 
-	bot.speak('@' + next.name + ", you're up!");
+	if (!nextDJ) {
+		return;
+	}
+
+	if (nextDJ.id === removedDJid) {
+		bot.speak('@' + nextDJ.name + " is next, but they just played. Does anyone else want to hop up?");
+		return;
+	}
+
+	if (!nextDJ.name) {
+		return;
+	}
+
+	nextDJInLine = nextDJ;
+	bot.speak('@' + nextDJ.name + ", you have 60 seconds to get up!");
+
+	nextInLineTimeout = setTimeout(() => {
+		nextDJInLine = null;
+		clearTimeout(nextInLineTimeout);
+	},60000);
 });
 
 bot.on('snagged', function (data) {
 	console.log('queue after snagged');
 	console.log(queue.getQueue());
 });
-
 
 bot.on('deregistered', function (data) {
 	if (oneAndDone) {
@@ -352,14 +385,55 @@ bot.on('deregistered', function (data) {
 	}
 });
 
-bot.on('endsong', function (data) {
+bot.on('newsong', function (data) {
 	if (!data.room || !data.room.metadata || !data.room.metadata.current_dj) {
 		return;
 	}
 
-	if (oneAndDone) {
-		console.log('queue after song ended');
-		console.log(queue.getQueue());
-		bot.remDj(lastDJ);
+	currentDJ = data.room.metadata.current_dj;
+	currentDJs = data.room.metadata.djs;
+
+	if (!oneAndDone || !currentDJ) {
+		return;
+	}
+
+	if (!userPlays.hasOwnProperty(currentDJ)) {
+		userPlays[currentDJ] = 0;
+	}
+
+	userPlays[currentDJ]++;
+});
+
+bot.on('endsong', function (data) {
+	currentDJs = data.room.metadata.djs;
+	let currentDJ = data.room.metadata.current_dj;
+
+	console.log('end song!');
+
+	console.log(data);
+	console.log(currentDJ);
+	console.log(queue.getUserName(currentDJ));
+	console.log({rotateStarted});
+	console.log({oneAndDone});
+	console.log(currentDJs[0]);
+	console.log(queue.getUserName(currentDJs[0]));
+
+	if (rotateStarted === true && oneAndDone === false && currentDJs.length > 0 && currentDJ == currentDJs[0]) {
+		startOneAndDone();
+		rotateStarted = false;
+	}
+
+	if (!oneAndDone) {
+		return;
+	}
+
+	console.log({userPlays});
+	console.log({currentDJ});
+
+	if (!userPlays.hasOwnProperty(currentDJ) || userPlays[currentDJ] >= playLimit) {
+		console.log({queue});
+		queue.addDJToQueue(currentDJ, queue.getUserName(currentDJ));
+		bot.speak('@' + queue.getUserName(currentDJ) + ', you have been added to the queue. Type /removeme to remove yourself.');
+		bot.remDj(currentDJ);
 	}
 });
