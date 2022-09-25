@@ -7,11 +7,11 @@ let Bot = require('ttapi');
 //sprockets
 var AUTH = 'dXhZHlHryToxwdnFpxSffHje';
 var USERID = '628ed9e688b736001d2464f4';
-var ROOMID = '60820a5647c69b001b3aa1f9';
+// var ROOMID = '60820a5647c69b001b3aa1f9';
 
 // var AUTH = 'dXhZHlHryToxwdnFpxSffHje';
 // var USERID = '628ed9e688b736001d2464f4';
-// var ROOMID = '63309a47748e09001fda9864';
+var ROOMID = '63309a47748e09001fda9864';
 
 let bot = new Bot(AUTH, USERID, ROOMID);
 bot.debug = true;
@@ -68,6 +68,24 @@ function startOneAndDone() {
 bot.on('speak', function (data) {
 	if (!data.text) {
 		return;
+	}
+
+	if (data.text === '/commands') {
+		bot.speak("\\rotate engages one and done \n \\stoprotate disengages one and done \n \\addme to add yourself to queue \n \\removeme to remove yourself from queue");
+	}
+
+	if (data.text.startsWith('/roll')) {
+		let regex = /\/roll\D*(\d+)/;
+		let matches = regex.exec(data.text);
+		if (matches.length > 0 && !isNaN(parseInt(matches[1]))) {
+			let number = parseInt(matches[1]);
+			if (number > 100) {
+				number = 100;
+			} else if (number < 1)  {
+				number = 1;
+			}
+			bot.speak('You roll a ' + number + ' sided dice and get ' + (Math.floor(Math.random() * number) + 1));
+		}
 	}
 
 	if (data.text === '/rotate' && !oneAndDone && !rotateStarted) {
