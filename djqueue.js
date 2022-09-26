@@ -34,10 +34,17 @@ class DJQueue {
         //     return;
         // }
 
-        // if (name === "") {
-        //     console.log("name is empty");
-        //     return;
-        // }
+        let index = this.queue.findIndex((dj) => {
+            return dj.id == id;
+        });
+        if (index > -1) {
+            return;
+        }
+
+        if (name === "") {
+            console.log("name is empty");
+            return;
+        }
 
         if (id === "") {
             console.log("id is empty");

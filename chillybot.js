@@ -27,6 +27,8 @@ let userPlays = {};
 let nextDJInLine;
 let nextInLineTimeout;
 let rotateStarted = false;
+let toEscort = {};
+let maintainingQueueOrder = false;
 
 bot.on('ready', function (data) {
 	console.log("on ready");
@@ -88,6 +90,58 @@ bot.on('speak', function (data) {
 		}
 	}
 
+	if (data.text === '/9') {
+		let gifs = [
+			"https://media.giphy.com/media/kfznTxem5HG0w/giphy.gif",
+			"https://media.giphy.com/media/sRFGnkY4BYBjGBdJIz/giphy.gif",
+			"https://media.giphy.com/media/3o8dp7uKPWmFYe2TeM/giphy.gif",
+			"https://media.giphy.com/media/LmwxkgDdxV1ToJW048/giphy.gif",
+			"https://media.giphy.com/media/1R8EfVEqTswDWvBFAi/giphy.gif",
+			"https://media.giphy.com/media/ZTDdarO1y8H3pAKO6o/giphy.gif",
+			"https://media.giphy.com/media/gIfWp2yO8xRajV9ufg/giphy.gif",
+			"https://media.giphy.com/media/M2Ml23remyvjq/giphy.gif",
+			"https://media.giphy.com/media/l2QDW6fklsISgA3MQ/giphy.gif",
+			"https://media.giphy.com/media/l3vRfhFD8hJCiP0uQ/giphy.gif",
+			"https://media.giphy.com/media/QuxqWk7m9ffxyfoa0a/giphy.gif",
+			"https://media.giphy.com/media/xWazTCAcI7m2A/giphy.gif",
+			"https://media.giphy.com/media/l41lNkAFGs7jyWzYY/giphy.gif",
+			"https://media.giphy.com/media/71UnFdzKw7kTm/giphy.gif",
+			"https://media.giphy.com/media/10QqGj0eqGOWIw/giphy.gif",
+			"https://media.giphy.com/media/5CchhJMhQAEbS/giphy.gif",
+			"https://media.giphy.com/media/XfE6Pcjy6LZW12XOS0/giphy.gif"
+		];
+
+		const randomGif = gifs[Math.floor(Math.random() * gifs.length)];
+		bot.speak(randomGif);
+	}
+
+	if (data.text === "/escortme") {
+		if (!currentDJs.includes(data.userid)) {
+			bot.speak("I can only escort you if you are on deck.");
+			return;
+		}
+
+		if (toEscort.hasOwnProperty(data.userid) && toEscort[data.userid] === true) {
+			bot.speak('@' + queue.getUserName(data.userid) + ', you have already requested to be escorted after your next play.');
+			return;
+		}
+
+		toEscort[data.userid] = true;
+		bot.speak('@' + queue.getUserName(data.userid) + ', you will be escorted after your next play.');
+		return;
+	}
+
+	if (data.text === "/unescortme") {
+		if (toEscort.hasOwnProperty(data.userid) && !toEscort[data.userid]) {
+			bot.speak('@' + queue.getUserName(data.userid) + ', you have not requested to be escorted.');
+			return;
+		}
+
+		toEscort[data.userid] = false;
+		bot.speak('@' + queue.getUserName(data.userid) + ', you will no longer be escorted after your next play.');
+		return;
+	}
+
 	if (data.text === '/rotate' && !oneAndDone && !rotateStarted) {
 		rotateStarted = true;
 
@@ -103,6 +157,7 @@ bot.on('speak', function (data) {
 		console.log(queue.getUserName(lastDJ));
 
 		if (firstDJ == lastDJ) {
+			oneAndDone = true;
 			bot.speak('One and done engaged, effective immediately!');
 		} else {
 			bot.speak('One and done will start with @' + queue.getUserName(firstDJ));
@@ -163,13 +218,11 @@ bot.on('speak', function (data) {
 			return;
 		}
 
-		bot.speak("Current queue is: " + queue.getQueue().map(function(dj) {
-			return dj.name;
-		}).join(", "));
+		printQueue();
 	}
 
 	if (data.text ===  '/addme') {
-		if (!oneAndDone) {
+		if (!oneAndDone && !rotateStarted) {
 			bot.speak('@' + data.name + ", there currently is no queue. Feel free to hop up whenever suits you.");
 			return;
 		}
@@ -193,6 +246,7 @@ bot.on('speak', function (data) {
 
 		queue.addDJToQueue(data.userid, data.name);
 		bot.speak('@' + data.name + ", you have been added to the queue!");
+		printQueue();
 
 		console.log('queue after adding DJ to queue');
 		console.log(queue.getQueue());
@@ -299,9 +353,19 @@ bot.on('newsong', (data) => {
 bot.on('add_dj', (data) => {
 	let userid = data['user'][0].userid;
 
+	currentDJs = Object.values(data.djs);
+
+	console.log('adding dj');
+	console.log({data});
+	console.log(queue.getUserName(userid));
+	console.log({currentDJs});
+	currentDJs.forEach((dj) => {
+		console.log(queue.getUserName(dj));
+	});
+
 	if (nextDJInLine) {
 		if (userid != nextDJInLine.id) {
-			bot.speak("Be cool, we're still waiting for @" + nextDJInLine.name + " to hop up.");
+			bot.speak("Hang tight, we're still waiting for @" + nextDJInLine.name + " to hop up.");
 			bot.remDj(userid);
 			return;
 		}
@@ -309,12 +373,8 @@ bot.on('add_dj', (data) => {
 		clearTimeout(nextInLineTimeout);
 	}
 
-	let index = currentDJs.findIndex((currentDJ) => {
-		return currentDJ === userid
-	});
-	if (!index) {
-		currentDJs.push(userid);
-	}
+	maintainingQueueOrder = false;
+
 	if (!oneAndDone) {
 		return
 	}
@@ -337,29 +397,27 @@ bot.on('rem_dj', function (data) {
 	console.log("remove dj!");
 	let userid = data['user'][0].userid;
 	console.log({userid});
-	console.log();
+	console.log({data});
 
-	let index = currentDJs.findIndex((currentDJ) => {
-		return currentDJ === userid
-	});
-	console.log("index when removing");
-	console.log(index);
-	console.log(index > -1);
+	let removedDJid = userid;
 
-	let removedDJid;
-
-	if (index > -1) {
-		removedDJid = currentDJs[index];
-		currentDJs.splice(index, 1);
-	}
+	currentDJs = Object.values(data.djs);
 
 	console.log("current djs after removing");
 	console.log({currentDJs});
 	console.log({removedDJid});
+	console.log({maintainingQueueOrder});
 
-	if (!oneAndDone) {
+	if (!oneAndDone || maintainingQueueOrder) {
 		return;
 	}
+
+	shiftQueue(removedDJid);
+});
+
+function shiftQueue(removedDJid) {
+	console.log('queue before popping');
+	console.log(queue.getQueue());
 
 	let nextDJ = queue.findNext();
 
@@ -371,7 +429,7 @@ bot.on('rem_dj', function (data) {
 		return;
 	}
 
-	if (nextDJ.id === removedDJid) {
+	if (nextDJ.id === removedDJid && currentDJs.length >= 4) {
 		bot.speak('@' + nextDJ.name + " is next, but they just played. Does anyone else want to hop up?");
 		return;
 	}
@@ -381,13 +439,19 @@ bot.on('rem_dj', function (data) {
 	}
 
 	nextDJInLine = nextDJ;
-	bot.speak('@' + nextDJ.name + ", you have 60 seconds to get up!");
+	bot.speak('@' + nextDJ.name + ", you have 1 minute to get up!");
+
+	maintainingQueueOrder = true;
 
 	nextInLineTimeout = setTimeout(() => {
 		nextDJInLine = null;
-		clearTimeout(nextInLineTimeout);
+		bot.speak('@' + nextDJ.name + ", you have been bumped from the queue. Type /addme to add yourself again.");
+		maintainingQueueOrder = false;
+		if (queue.getQueue().length > 0)  {
+			shiftQueue(removedDJid);
+		}
 	},60000);
-});
+}
 
 bot.on('snagged', function (data) {
 	console.log('queue after snagged');
@@ -426,6 +490,14 @@ bot.on('endsong', function (data) {
 	currentDJs = data.room.metadata.djs;
 	let currentDJ = data.room.metadata.current_dj;
 
+	if (!oneAndDone) {
+		if (toEscort.hasOwnProperty(currentDJ) && toEscort[currentDJ] === true) {
+			toEscort[currentDJ] = false;
+			bot.remDj(currentDJ);
+			bot.speak('@'+queue.getUserName(currentDJ) + ', as requested you have been escorted down.');
+		}
+	}
+
 	console.log('end song!');
 
 	console.log(data);
@@ -450,8 +522,20 @@ bot.on('endsong', function (data) {
 
 	if (!userPlays.hasOwnProperty(currentDJ) || userPlays[currentDJ] >= playLimit) {
 		console.log({queue});
-		queue.addDJToQueue(currentDJ, queue.getUserName(currentDJ));
-		bot.speak('@' + queue.getUserName(currentDJ) + ', you have been added to the queue. Type /removeme to remove yourself.');
-		bot.remDj(currentDJ);
+		bot.remDj(currentDJ, (remDJResult) => {
+			console.log({remDJResult});
+			if (remDJResult.success == false) {
+				return;
+			}
+			console.log("remove dj callback");
+			queue.addDJToQueue(currentDJ, queue.getUserName(currentDJ));
+			printQueue();
+		});
 	}
 });
+
+function printQueue() {
+	bot.speak("Current queue is: " + queue.getQueue().map(function(dj) {
+		return dj.name;
+	}).join(", "));
+}
