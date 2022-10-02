@@ -7,11 +7,11 @@ let Bot = require('ttapi');
 //sprockets
 var AUTH = 'dXhZHlHryToxwdnFpxSffHje';
 var USERID = '628ed9e688b736001d2464f4';
-// var ROOMID = '60820a5647c69b001b3aa1f9';
+var ROOMID = '60820a5647c69b001b3aa1f9';
 
 // var AUTH = 'dXhZHlHryToxwdnFpxSffHje';
 // var USERID = '628ed9e688b736001d2464f4';
-var ROOMID = '63309a47748e09001fda9864';
+// var ROOMID = '63309a47748e09001fda9864';
 
 let bot = new Bot(AUTH, USERID, ROOMID);
 bot.debug = true;
@@ -90,7 +90,7 @@ bot.on('speak', function (data) {
 		}
 	}
 
-	if (data.text === '/9') {
+	if (data.text === ':9:') {
 		let gifs = [
 			"https://media.giphy.com/media/kfznTxem5HG0w/giphy.gif",
 			"https://media.giphy.com/media/sRFGnkY4BYBjGBdJIz/giphy.gif",
@@ -108,7 +108,37 @@ bot.on('speak', function (data) {
 			"https://media.giphy.com/media/71UnFdzKw7kTm/giphy.gif",
 			"https://media.giphy.com/media/10QqGj0eqGOWIw/giphy.gif",
 			"https://media.giphy.com/media/5CchhJMhQAEbS/giphy.gif",
-			"https://media.giphy.com/media/XfE6Pcjy6LZW12XOS0/giphy.gif"
+			"https://media.giphy.com/media/XfE6Pcjy6LZW12XOS0/giphy.gif",
+			"https://media.giphy.com/media/MmTuPMAuUjumc/giphy.gif",
+			"https://media.giphy.com/media/1pA5bNYbDnSc6K45LI/giphy.gif",
+			"https://giphy.com/gifs/skull-skulls-gif-F6ub4AQXz13xK",
+			"https://giphy.com/gifs/skeleton-dance-qTD9EXZRgI1y0",
+			"https://giphy.com/gifs/love-dance-BvC7TmEd7odbi",
+			"https://giphy.com/gifs/spooky-macabre-wtfchrisstuff-P0I4FJmnYl5E4",
+			"https://giphy.com/gifs/black-and-white-halloween-O9SfWhDlVFsvC",
+			"https://giphy.com/gifs/inpulsedm-l3vRb92lVAy2yXJnO",
+			"https://giphy.com/gifs/spooky-spoopy-seriously-every-year-5zI213WKIL2uI",
+			"https://giphy.com/gifs/smile-joker-corncob-26vIdGToqHJNFc3tu",
+			"https://giphy.com/gifs/eyes-neon-roar-xUPGcrEwuDJmKeDZK0",
+			"https://giphy.com/gifs/season-7-ahs-fx-xUn3Cc9P0CdKoSbMdi",
+			"https://giphy.com/gifs/zombie-black-and-white-horror-1Pq6EZxEQ7sbu",
+			"https://giphy.com/gifs/animation-black-and-white-visitor-26h0qLFdOBklnBsyI",
+			"https://giphy.com/gifs/pammypocket-creepy-spooky-scary-thomas-the-tank-RIHJGMww0p2IZng2l9",
+			"https://giphy.com/gifs/129rZZ3a4anp0Q",
+			"https://giphy.com/gifs/horror-viy-OsazxrOHCXQBi",
+			"https://giphy.com/gifs/movie-scary-jim-carrey-2pCOOzE06hJcc",
+			"https://giphy.com/gifs/scary-laughing-puppets-fGuqeA6PiXINa",
+			"https://giphy.com/gifs/scary-spooky-u5JgW2KU3T1x6",
+			"https://giphy.com/gifs/cat-scary-attack-Xn45Idyn6JxTi",
+			"https://giphy.com/gifs/quotecatalog-dance-3oKIPbKtneOWixLShO",
+			"https://giphy.com/gifs/alien-shadow-mystery-QcQrhJH9UWr0tbvwYV",
+			"https://giphy.com/gifs/paranormal-crypt-nightvision-b2c9qnyHRg2afFYOP2",
+			"https://giphy.com/gifs/haze-hazy-gif-hLP8nZ7HmukyA",
+			"https://giphy.com/gifs/bestyouth-vanish-best-youth-rumba-nera-bBntLYoOJhqv0sJ1Tr",
+			"https://giphy.com/gifs/ashvsevildead-season-3-1kIwyU8oi7WUunM4ms",
+			"https://giphy.com/gifs/horror-photography-scary-sZSF5oIOYQdJ6",
+			"https://giphy.com/gifs/skeleton-movie-black-and-white-7atcoVG3Wy8nu",
+			"https://giphy.com/gifs/foxadhd-artists-on-tumblr-einar-baldvin-xasTHaFHEWV2g",
 		];
 
 		const randomGif = gifs[Math.floor(Math.random() * gifs.length)];
@@ -222,8 +252,23 @@ bot.on('speak', function (data) {
 	}
 
 	if (data.text ===  '/addme') {
+		if (!oneAndDone && !rotateStarted && currentDJs && currentDJs.length >= 5) {
+			startOneAndDone();
+			queue.addDJToQueue(data.userid, data.name);
+			bot.speak('@' + data.name + ", you have been added to the queue!");
+			printQueue();
+			return;
+		}
+
+		if (currentDJs && currentDJs.length)
+
 		if (!oneAndDone && !rotateStarted) {
 			bot.speak('@' + data.name + ", there currently is no queue. Feel free to hop up whenever suits you.");
+			return;
+		}
+
+		if ((oneAndDone || rotateStarted) && currentDJs.length < 5) {
+			bot.speak('@' + data.name + ", looks like there's a spot with your name on it. Hop on up!");
 			return;
 		}
 
@@ -430,7 +475,8 @@ function shiftQueue(removedDJid) {
 	}
 
 	if (nextDJ.id === removedDJid && currentDJs.length >= 4) {
-		bot.speak('@' + nextDJ.name + " is next, but they just played. Does anyone else want to hop up?");
+		stopRotate();
+		bot.speak('@' + nextDJ.name + " is next, but they just played. One is done is disengaged. Type /rotate to start it again.");
 		return;
 	}
 
