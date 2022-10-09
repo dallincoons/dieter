@@ -148,6 +148,8 @@ bot.on('speak', function (data) {
 			"https://media.giphy.com/media/sZSF5oIOYQdJ6/giphy.gif",
 			"https://media.giphy.com/media/7atcoVG3Wy8nu/giphy.gif",
 			"https://media.giphy.com/media/xasTHaFHEWV2g/giphy.gif",
+			"https://thumbs.gfycat.com/AlertIckyBison-size_restricted.gif",
+			"https://media.tenor.com/kVM2t4UP_UAAAAAM/mike-myers-sprockets.gif",
 		];
 
 		const randomGif = gifs[Math.floor(Math.random() * gifs.length)];
