@@ -19,6 +19,8 @@ bot.debug = true;
 let lastDJ = undefined;
 let oneAndDone = false;
 let currentDJs = [];
+let currentSong = undefined;
+let currentSongPlays = 0;
 
 let queue;
 
@@ -254,6 +256,8 @@ bot.on('registered', function (data) {
 });
 
 bot.on('newsong', (data) => {
+	currentSong = data["room"]["metadata"]["current_song"]["metadata"]["mnid"];
+	currentSongPlays = 0;
 	if (oneAndDone) {
 		console.log('queue after new song');
 		console.log(queue.getQueue());
@@ -338,8 +342,10 @@ bot.on('rem_dj', function (data) {
 });
 
 bot.on('snagged', function (data) {
-	console.log('queue after snagged');
-	console.log(queue.getQueue());
+	currentSongPlays++;
+	console.log("on snagged");
+	console.log({data});
+	bot.playlistAdd(currentSong);
 });
 
 
