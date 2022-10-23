@@ -87,6 +87,11 @@ bot.on('speak', function (data) {
 		bot.speak("\\rotate engages one and done \n \\stoprotate disengages one and done \n \\addme to add yourself to queue \n \\removeme to remove yourself from queue");
 	}
 
+	if (data.text === '911') {
+		bot.speak(':rotating_light:');
+		return;
+	}
+
 	if (data.text.startsWith('/roll')) {
 		let regex = /\/roll\D*(\d+)/;
 		let matches = regex.exec(data.text);
@@ -576,6 +581,16 @@ bot.on('endsong', function (data) {
 	console.log({oneAndDone});
 	console.log(currentDJs[0]);
 	console.log(queue.getUserName(currentDJs[0]));
+
+	if (currentDJs.length < numberOfSeats && oneAndDone === false && rotateStarted === true) {
+		rotateStarted = false;
+		return;
+	}
+
+	if (currentDJs.length < numberOfSeats && oneAndDone === true) {
+		stopRotate();
+		return;
+	}
 
 	if (rotateStarted === true && oneAndDone === false && currentDJs.length > 0 && currentDJ == currentDJs[0]) {
 		oneAndDone = true;
